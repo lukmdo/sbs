@@ -76,7 +76,7 @@ def get_main_page():
             break
 
     page = '\n'.join(items)
-    return  page
+    return page
 
 
 class Spider(object):
@@ -114,10 +114,10 @@ class Spider(object):
 
     def parse(self, url=None, page=None):
         if url:
-           document, resp = self.from_url(url)
-           page = resp.text
+            document, resp = self.from_url(url)
+            page = resp.text
         elif page:
-           document = self.from_page(page)
+            document = self.from_page(page)
 
         return self.parse_document(document, page)
 
@@ -193,8 +193,8 @@ class SBSpider(Spider):
     @staticmethod
     def dict_item(item):
         return {
-           'results': [
-               SBProductSpider.dict_item(item) for item in item.results],
+            'results': [
+                SBProductSpider.dict_item(item) for item in item.results],
             'total': item.total,
         }
 
