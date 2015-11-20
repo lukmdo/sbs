@@ -1,5 +1,5 @@
 # sbs
-Sainsbury's dummy spider (3.5h)
+Sainsbury's dummy spider (5.5h)
 
     python setup.py install
     python setup.py test

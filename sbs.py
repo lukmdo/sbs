@@ -29,7 +29,7 @@ URL = (
     'IcoVeZxUZ%2FuBmFSJ5Jz%0Ah9rsDZkPn%2F9zErvK22TJAvNb1vE0m8LtWh9YyBAgBe73rpz'
     '7NM2llRHxiP02PJWQ0nDeyt324Taz%0AaMuK3%2FovR2uKRbx0vHMOi2EwHSef'
     '&ddkey=http:AjaxApplyFilterBrowseView')
-_REQ_TIMEOUT_SEC = 5
+REQ_TIMEOUT_SEC = 5
 log = logging.getLogger(__name__)
 
 
@@ -42,15 +42,14 @@ def main():
     log.addHandler(default_log_handler)
 
     page = get_main_page()
-    result = SBSpider().parse(page=page)
-    data = {
-        'results': [vars(item) for item in result.results],
-        'total': result.total,
-    }
+    spider = SBSpider()
+    item = spider.parse(page=page)
+    data = spider.dict_item(item)
+
     print(json.dumps(data, sort_keys=True, indent=2))
 
 
-def _fetch_page(url, timeout=_REQ_TIMEOUT_SEC):
+def _fetch_page(url, timeout=REQ_TIMEOUT_SEC):
     """
     :rtype requests.Response
     """
@@ -79,6 +78,7 @@ def get_main_page():
     page = '\n'.join(items)
     return  page
 
+
 class Spider(object):
     # `parse` and `pare_document` should return Item
     Item = collections.namedtuple('Item', [])
@@ -88,10 +88,18 @@ class Spider(object):
     # remove_pis=False
     # strip_cdata=False
 
+    @staticmethod
+    def dict_item(self, item):
+        """
+        Convert `item` to dict
+        """
+        raise NotImplementedError
+
     class Selectors(object):
         """
         Groups selectors for readability and some perf
         """
+
     def from_url(self, url):
         resp = _fetch_page(url)
         document = self.from_page(resp.text)
@@ -129,22 +137,37 @@ class SBProductSpider(Spider):
     Item = collections.namedtuple(
         'Item', ('title', 'price', 'description', 'size'))
 
+    @staticmethod
+    def dict_item(item):
+        return vars(item)
+
     class Selectors(object):
         @staticmethod
         def title(document):
-            return CSSSelector(
-                '.productTitleDescriptionContainer > h1')(document)[0].text
+            element = CSSSelector(
+                '.productTitleDescriptionContainer > h1')(document)
+            if not element:
+                return ''
+            element = element[0]
+            text = element.text_content().strip()
+            return text
 
         @staticmethod
         def price(document):
-            element = CSSSelector('.productSummary .pricePerUnit')(document)[0]
+            element = CSSSelector('.productSummary .pricePerUnit')(document)
+            if not element:
+                return 0
+            element = element[0]
             match = SBProductSpider.price_regx.search(element.text_content())
             price = float(match.group(0)) if match else 0
             return price
 
         @staticmethod
         def description(document):
-            element = CSSSelector('#information .productText')(document)[0]
+            element = CSSSelector('#information .productText')(document)
+            if not element:
+                return ''
+            element = element[0]
             text = element.text_content().strip()
             if text.startswith('Description'):
                 text = text[11:].lstrip()
@@ -166,6 +189,14 @@ class SBSpider(Spider):
     """
     item_spider = SBProductSpider()
     Item = collections.namedtuple('Item', ('results', 'total'))
+
+    @staticmethod
+    def dict_item(item):
+        return {
+           'results': [
+               SBProductSpider.dict_item(item) for item in item.results],
+            'total': item.total,
+        }
 
     class Selectors(object):
         @staticmethod
