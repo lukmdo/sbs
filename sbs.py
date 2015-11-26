@@ -111,6 +111,8 @@ class Spider(object):
     def dict_item(self, item):
         """
         Convert `item` to dict
+        :type item: self.Item
+        :rtype: dict
         """
         raise NotImplementedError
 
@@ -120,14 +122,17 @@ class Spider(object):
         """
 
     def from_url(self, url):
+        """
+        :rtype: tuple (lxml.etree.ElementTree, requests.Response)
+        """
         resp = _fetch_page(url)
         document = self.from_page(resp.text)
         return document, resp
 
     def from_page(self, page):
         """
-        :type page:
-        :rtype:
+        :type page: unicode response body
+        :rtype: lxml.etree.ElementTree
         """
         return lxml.html.parse(io.StringIO(page), parser=self.parser)
 
@@ -142,7 +147,8 @@ class Spider(object):
 
     def parse_document(self, document, raw):
         """
-        :type document:
+        :type document: lxml.etree.ElementTree
+        :type raw: unicode response body
         :type Spider.Item
         """
         raise NotImplementedError
