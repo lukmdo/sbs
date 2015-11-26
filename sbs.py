@@ -1,7 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-TODO: add assumptions
+Assumptions:
+- ok to break execution if any of product fetching fails (all or nothing)
+- ok to add extra logging to Stderr
+- ok to skip nice help and options (otherwise would use http://click.pocoo.org/)
+- ok with Very basic tests
+- ok with python>=3.4
 """
 import re
 import io
@@ -16,7 +21,7 @@ import requests
 import requests.exceptions
 
 
-VERSION = (0, 0, 1)
+VERSION = (0, 0, 2)
 __version__ = VERSION
 __versionstr__ = '.'.join(map(str, VERSION))
 
@@ -30,6 +35,10 @@ URL = (
     '7NM2llRHxiP02PJWQ0nDeyt324Taz%0AaMuK3%2FovR2uKRbx0vHMOi2EwHSef'
     '&ddkey=http:AjaxApplyFilterBrowseView')
 REQ_TIMEOUT_SEC = 5
+ERROR_CODE_TIMEOUT = 2
+ERROR_CODE_CONNECTION = 3
+ERROR_CODE_RESPONSE = 4
+
 log = logging.getLogger(__name__)
 
 
@@ -52,14 +61,27 @@ def main():
 def _fetch_page(url, timeout=REQ_TIMEOUT_SEC):
     """
     :rtype requests.Response
+    :raises
+    will sys.exit on error with code
+    - requests.exceptions.HTTPError
+    - ERROR_CODE_TIMEOUT
+    - ERROR_CODE_CONNECTION
     """
     msg = 'Fetching {}'.format(url)
     log.info(msg)
     try:
         resp = requests.get(url, timeout=timeout)
         resp.raise_for_status()
+    except requests.exceptions.HTTPError:
+        log.exception(msg + ' - Response NOT 200 OK')
+        exit(ERROR_CODE_RESPONSE)
     except requests.exceptions.Timeout:
-        log.error(msg + ' - Timeout')
+        log.exception(msg + ' - Timeout')
+        exit(ERROR_CODE_TIMEOUT)
+    except requests.exceptions.ConnectionError:
+        log.exception(msg + ' - Connection Failure')
+        exit(ERROR_CODE_CONNECTION)
+
     log.info(msg + ' - Done')
 
     return resp
@@ -80,13 +102,10 @@ def get_main_page():
 
 
 class Spider(object):
-    # `parse` and `pare_document` should return Item
+    # `parse` and `pare_document` should return self.Item
     Item = collections.namedtuple('Item', [])
 
     parser = lxml.html.HTMLParser(compact=False)
-    # remove_comments=False
-    # remove_pis=False
-    # strip_cdata=False
 
     @staticmethod
     def dict_item(self, item):
@@ -135,7 +154,7 @@ class SBProductSpider(Spider):
     """
     price_regx = re.compile('(\d+(:?\.\d+)?)')
     Item = collections.namedtuple(
-        'Item', ('title', 'price', 'description', 'size'))
+        'Item', ('title', 'unit_price', 'description', 'size'))
 
     @staticmethod
     def dict_item(item):
@@ -177,10 +196,10 @@ class SBProductSpider(Spider):
         title = self.Selectors.title(document)
         price = self.Selectors.price(document)
         description = self.Selectors.description(document)
-        size = '{:.01f}kb'.format(len(raw) / 1024)
+        size = '{:.01f}kb'.format(len(raw) / 1024)  # http 'Content-Length'
 
         return self.Item(
-            title=title, price=price, description=description, size=size)
+            title=title, unit_price=price, description=description, size=size)
 
 
 class SBSpider(Spider):
@@ -209,7 +228,7 @@ class SBSpider(Spider):
         for link in self.Selectors.items(document):
             result = self.item_spider.parse(url=link.get('href'))
             results.append(result)
-            total += result.price
+            total += result.unit_price
 
         return self.Item(results=results, total=total)
 

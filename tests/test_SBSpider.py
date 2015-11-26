@@ -35,6 +35,7 @@ def test_parse(spider, products_page, product_page, response_mock, ):
 
 
 def test_dict_item(spider):
-    item = spider.Item(results=[], total=0)
-    data = spider.dict_item(item)
-    assert data == dict(results=[], total=0)
+    data = dict(results=[], total=0)
+    item = spider.Item(**data)
+    assert spider.dict_item(item) == data
+
